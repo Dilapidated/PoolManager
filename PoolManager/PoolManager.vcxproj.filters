@@ -1,0 +1,59 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="poolmanager.cpp" />
+    <ClCompile Include="dependencies\minhook\src\hde\hde32.c">
+      <Filter>Dependencies\minhook</Filter>
+    </ClCompile>
+    <ClCompile Include="dependencies\minhook\src\hde\hde64.c">
+      <Filter>Dependencies\minhook</Filter>
+    </ClCompile>
+    <ClCompile Include="dependencies\minhook\src\buffer.c">
+      <Filter>Dependencies\minhook</Filter>
+    </ClCompile>
+    <ClCompile Include="dependencies\minhook\src\hook.c">
+      <Filter>Dependencies\minhook</Filter>
+    </ClCompile>
+    <ClCompile Include="dependencies\minhook\src\trampoline.c">
+      <Filter>Dependencies\minhook</Filter>
+    </ClCompile>
+    <ClCompile Include="dependencies\patterns\Hooking.Patterns.cpp">
+      <Filter>Dependencies\patterns</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooking.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\atPool.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Utils.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\sigslot.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Hooking.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\gta_vtables.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\dllmain.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Include">
+      <UniqueIdentifier>{fd7360d8-89bc-46a6-951c-25b8eb197f0a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Dependencies">
+      <UniqueIdentifier>{d72e835f-f483-4051-9b63-dc51ecab1b5c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Dependencies\minhook">
+      <UniqueIdentifier>{b7e3044e-7f43-47be-8597-74978e7db899}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Dependencies\patterns">
+      <UniqueIdentifier>{267ab640-5f3e-4ea1-ac09-0a1b4ed70ed3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
