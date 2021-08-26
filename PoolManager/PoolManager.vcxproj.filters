@@ -56,4 +56,7 @@
       <UniqueIdentifier>{267ab640-5f3e-4ea1-ac09-0a1b4ed70ed3}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="PoolManager.ini" />
+  </ItemGroup>
 </Project>

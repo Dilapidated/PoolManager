@@ -4,6 +4,9 @@
 #include <MinHook.h>
 #include <iostream>
 #include <Utils.h>
+#include <sstream>
+#include <iostream>
+#include <fstream>
 
 class RageHashList
 {
@@ -17,23 +20,68 @@ public:
 		}
 	}
 
-	inline std::string LookupHash(uint32_t hash)
+	inline std::string LookupHashString(uint32_t hash)
 	{
+		if (hash == NULL)
+		{
+			return "Unknown";
+		}
+		
 		auto it = m_lookupList.find(hash);
-
 		if (it != m_lookupList.end())
 		{
 			return std::string(it->second);
 		}
 
 		char buffer[32];
-		snprintf(buffer, std::size(buffer), "0x%08x", hash);
+		snprintf(buffer, std::size(buffer), "0x%08X", hash);
+		return buffer;
+	}
+
+	inline std::string LookupHash(uint32_t hash)
+	{
+		if (hash == NULL)
+		{
+			return "Unknown";
+		}
+
+		char buffer[32];
+		snprintf(buffer, std::size(buffer), "0x%08X", hash);
 		return buffer;
 	}
 
 private:
 	std::map<uint32_t, std::string_view> m_lookupList;
 };
+
+int LogAllPoolCalls = GetPrivateProfileInt("POOL_SETTINGS", "LogAllPoolCalls", 0, ".\\PoolManager.ini");
+int LogStartupPoolCalls = GetPrivateProfileInt("POOL_SETTINGS", "LogStartupPoolCalls ", 0, ".\\PoolManager.ini");
+
+//a boolean flag that lets us "remember" if this thing has happened already
+bool clearedLogs = false;
+
+void cleanUpLogs() 
+{
+	if (!clearedLogs)
+	{
+		if (LogAllPoolCalls != 0)
+		{
+			std::ofstream outfile;
+			outfile.open("PoolManager_Verbose.log", std::ofstream::out | std::ofstream::trunc);
+			outfile.close();
+		}
+
+		if (LogStartupPoolCalls != 0)
+		{
+			std::ofstream outfile;
+			outfile.open("PoolManager_Startup.log", std::ofstream::out | std::ofstream::trunc);
+			outfile.close();
+		}
+
+		clearedLogs = true;
+	}
+}
+
 
 static std::map<uint32_t, atPoolBase*> g_pools;
 static std::map<atPoolBase*, uint32_t> g_inversePools;
@@ -197,6 +245,20 @@ static atPoolBase* SetPoolFn(atPoolBase* pool, uint32_t hash)
 	g_pools[hash] = pool;
 	g_inversePools.insert({ pool, hash });
 
+	if (LogStartupPoolCalls != 0)
+	{
+		cleanUpLogs();
+		std::string poolName = poolEntries.LookupHashString(hash);
+		std::string poolNameHash = poolEntries.LookupHash(hash);
+
+		std::ofstream outfile;
+		outfile.open("PoolManager_Startup.log", std::ios_base::app);
+		outfile << "poolName: " << poolName.c_str() << std::endl
+			<< "poolHash: " << poolNameHash.c_str() << std::endl
+			<< "poolSize: " << pool->GetSize() << std::endl
+			<< std::endl;
+	}
+
 	return pool;
 }
 
@@ -223,17 +285,39 @@ static void* PoolAllocateWrap(atPoolBase* pool)
 {
 	void* value = g_origPoolAllocate(pool);
 
+
+	if (LogAllPoolCalls != 0)
+	{
+		cleanUpLogs();
+		auto itt = g_inversePools.find(pool);
+		uint32_t poolHashh = itt->second;
+		std::string poolNamee = poolEntries.LookupHashString(poolHashh);
+		std::string poolNameHashh = poolEntries.LookupHash(poolHashh);
+
+		std::ofstream outfile;
+		outfile.open("PoolManager_Verbose.log", std::ios_base::app);
+		outfile << "poolName: " << poolNamee.c_str() << std::endl
+			<< "poolHash: " << poolNameHashh.c_str() << std::endl
+			<< "poolSize: " << pool->GetSize() << std::endl
+			<< "poolCount: " << pool->GetCount() << std::endl
+			<< std::endl;
+	}
+
 	if (!value)
 	{
 		auto it = g_inversePools.find(pool);
-		std::string poolName = "Unknown";
 
-		if (it != g_inversePools.end())
-		{
-			uint32_t poolHash = it->second;
+		uint32_t poolHash = it->second;
+		std::string poolName = poolEntries.LookupHashString(poolHash);
+		std::string poolNameHash = poolEntries.LookupHash(poolHash);
 
-			poolName = poolEntries.LookupHash(poolHash);
-		}
+		std::ofstream outfile;
+		outfile.open("PoolManager_Crash.log", std::ios_base::app);
+		outfile << "poolName: " << poolName.c_str() << std::endl
+			<< "poolHash: " << poolNameHash.c_str() << std::endl
+			<< "poolSize: " << pool->GetSize() << std::endl
+			<< std::endl;
+		outfile.close();
 
 		char buff[256];
 		std::string extraWarning;
@@ -243,7 +327,7 @@ static void* PoolAllocateWrap(atPoolBase* pool)
 			extraWarning = buff;
 		}
 
-		sprintf_s(buff, "%s pool crashed the game! \nCurrent pool size: %llu%s", poolName.c_str(), pool->GetSize(), extraWarning.c_str());
+		sprintf_s(buff, "%s pool crashed the game! \nPool hash: %s \nCurrent pool size: %llu \nCrash saved to PoolManager_Crash.log %s", poolName.c_str(), poolNameHash.c_str(), pool->GetSize(), extraWarning.c_str());
 		std::cout << buff;
 		HWND hWnd = FindWindow("grcWindow", NULL);
 		int msgboxID = MessageBox(hWnd, buff, "PoolManager.asi", MB_OK | MB_ICONERROR);
