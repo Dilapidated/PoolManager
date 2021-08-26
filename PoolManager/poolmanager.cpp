@@ -289,15 +289,15 @@ static void* PoolAllocateWrap(atPoolBase* pool)
 	if (LogAllPoolCalls != 0)
 	{
 		cleanUpLogs();
-		auto itt = g_inversePools.find(pool);
-		uint32_t poolHashh = itt->second;
-		std::string poolNamee = poolEntries.LookupHashString(poolHashh);
-		std::string poolNameHashh = poolEntries.LookupHash(poolHashh);
+		auto it = g_inversePools.find(pool);
+		uint32_t poolHash = it->second;
+		std::string poolName = poolEntries.LookupHashString(poolHash);
+		std::string poolNameHash = poolEntries.LookupHash(poolHash);
 
 		std::ofstream outfile;
 		outfile.open("PoolManager_Verbose.log", std::ios_base::app);
-		outfile << "poolName: " << poolNamee.c_str() << std::endl
-			<< "poolHash: " << poolNameHashh.c_str() << std::endl
+		outfile << "poolName: " << poolName.c_str() << std::endl
+			<< "poolHash: " << poolNameHash.c_str() << std::endl
 			<< "poolSize: " << pool->GetSize() << std::endl
 			<< "poolCount: " << pool->GetCount() << std::endl
 			<< std::endl;
