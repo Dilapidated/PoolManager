@@ -88,6 +88,7 @@ void cleanUpLogs()
 static std::map<uint32_t, atPoolBase*> g_pools;
 static std::map<atPoolBase*, uint32_t> g_inversePools;
 static std::map<std::string, int> g_intPools;
+static std::multimap<int, std::string> g_intPoolsMulti;
 
 static const char* poolEntriesTable[] = {
 "actiontable_branches",
@@ -366,6 +367,18 @@ static void* PoolAllocateWrap(atPoolBase* pool)
 			std::string poolName = poolEntries.LookupHashString(poolHash);
 			std::string poolNameHash = poolEntries.LookupHash(poolHash);
 
+			auto comparisons = g_intPoolsMulti.equal_range(pool->GetSize());
+
+			if (poolName == "unknown" && comparisons.first != comparisons.second)
+			{
+				poolName = "unknown - possible pool names with same value: ";;
+
+				for (auto comparisonsr = comparisons.first; comparisonsr != comparisons.second; ++comparisonsr)
+				{
+					poolName = poolName + " " + comparisonsr->second;
+				}
+			}
+
 			auto poolSize = pool->GetSize();
 			auto poolCount = pool->GetCount();
 			float percent = (float)poolCount / (float)poolSize;
@@ -399,6 +412,17 @@ static void* PoolAllocateWrap(atPoolBase* pool)
 		uint32_t poolHash = it->second;
 		std::string poolName = poolEntries.LookupHashString(poolHash);
 		std::string poolNameHash = poolEntries.LookupHash(poolHash);
+
+		auto comparisons = g_intPoolsMulti.equal_range(pool->GetSize());
+		if (poolName == "unknown" && comparisons.first != comparisons.second)
+		{
+			poolName = "unknown - possible pool names with same value: ";;
+
+			for (auto comparisonsr = comparisons.first; comparisonsr != comparisons.second; ++comparisonsr)
+			{
+				poolName = poolName + " " + comparisonsr->second;
+			}
+		}
 
 		std::ofstream outfile;
 		outfile.open("PoolManager_Crash.log", std::ios_base::app);
@@ -448,12 +472,16 @@ std::uint32_t GetSizeOfPool(void* _this, uint32_t hash, std::uint32_t minSize)
 	if (it == g_intPools.end())
 	{
 		g_intPools.insert({ poolName, value });
-		std::ofstream outfile;
-		outfile.open("PoolManager_Startup.log", std::ios_base::app);
-		outfile << "poolName: " << poolName.c_str() << std::endl
-			<< "poolHash: " << poolNameHash.c_str() << std::endl
-			<< "poolSize: " << value << std::endl
-			<< std::endl;
+		g_intPoolsMulti.insert({ value, poolName });
+		if (LogInitialPoolAmounts != 0)
+		{
+			std::ofstream outfile;
+			outfile.open("PoolManager_Startup.log", std::ios_base::app);
+			outfile << "poolName: " << poolName.c_str() << std::endl
+				<< "poolHash: " << poolNameHash.c_str() << std::endl
+				<< "poolSize: " << value << std::endl
+				<< std::endl;
+		}
 	}
 	
 	return value;
@@ -525,21 +553,19 @@ void InitializeMod()
 	registerPools(hook::pattern("BA ? ? ? ? 41 B8 ? 00 00 00 E8 ? ? ? ? C6"), 0x35, 1);
 	registerPools(hook::pattern("44 8B C0 BA ? ? ? ? E8 ? ? ? ? 4C 8D 05"), 0x25, 4);
 
-	// Get Initial Pool Sizea
-	if (LogInitialPoolAmounts != 0)
+	// Get Initial Pool Sizes
+	if (std::filesystem::exists(".\\ScriptHookV.dll")) //If using SHV use different pattern to avoid double hook
 	{
-		if (std::filesystem::exists(".\\ScriptHookV.dll")) //If using SHV use different pattern to avoid double hook
-		{
-			uint8_t* loc = hook::get_pattern<uint8_t>("E8 ? ? ? ? 48 8D 4F 38 41 B0 01 8B D0", 1);
-			loc += *(int32_t*)loc + 4;
-			MH_CreateHook(loc, GetSizeOfPool, (void**)&g_origSizeOfPool);
-		}
-		else
-		{
-			void* loc = hook::get_pattern("45 33 DB 44 8B D2 66 44 39 59 ? 74 4B");
-			MH_CreateHook(loc, GetSizeOfPool, (void**)&g_origSizeOfPool);
-		}
+		uint8_t* loc = hook::get_pattern<uint8_t>("E8 ? ? ? ? 48 8D 4F 38 41 B0 01 8B D0", 1);
+		loc += *(int32_t*)loc + 4;
+		MH_CreateHook(loc, GetSizeOfPool, (void**)&g_origSizeOfPool);
 	}
+	else
+	{
+		void* loc = hook::get_pattern("45 33 DB 44 8B D2 66 44 39 59 ? 74 4B");
+		MH_CreateHook(loc, GetSizeOfPool, (void**)&g_origSizeOfPool);
+	}
+
 
 
 	// Pool Allocate Wrap
