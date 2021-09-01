@@ -22,6 +22,7 @@ public:
 
 	inline std::string LookupHashString(uint32_t hash)
 	{
+
 		if (hash == NULL)
 		{
 			return "unknown";
@@ -131,6 +132,7 @@ static const char* poolEntriesTable[] = {
 "camlookaheadhelper",
 "camlookatdampinghelper",
 "camoscillator",
+"camsplinenode",
 "camspringmount",
 "camthirdpersonframeinterpolator",
 "carmiksolver",
@@ -144,8 +146,8 @@ static const char* poolEntriesTable[] = {
 "ccargen",
 "ccargenforscenarios",
 "cclimbhandholddetected",
-"ccombatdirector",
 "ccollectioninfo",
+"ccombatdirector",
 "ccombatinfo",
 "ccombatsituation",
 "ccoverfinder",
@@ -164,6 +166,7 @@ static const char* poolEntriesTable[] = {
 "cgrabhelper",
 "chandlingobject",
 "cinventoryitem",
+"clandinggear_qkdfqq",
 "clegiksolver",
 "clegiksolverproxy",
 "clightextension",
@@ -173,7 +176,9 @@ static const char* poolEntriesTable[] = {
 "cmoveped",
 "cmovevehicle",
 "cnamedpatrolroute",
+"collision_5plvhjd",
 "combatmeleemanager_groups",
+"combatmeleemanager_groupsmp",
 "combatmountedmanager_attacks",
 "compentity",
 "cpathnoderoutesearchhelper",
@@ -214,6 +219,7 @@ static const char* poolEntriesTable[] = {
 "cvehiclechasedirector",
 "cvehiclecliprequesthelper",
 "cvehiclecombatavoidancearea",
+"cvehicleintelligence_8xo47n9",
 "cvehiclestreamrendergfx",
 "cvehiclestreamrequestgfx",
 "cweapon",
@@ -222,6 +228,7 @@ static const char* poolEntriesTable[] = {
 "decoratorextension",
 "drawablestore",
 "dummy",
+"dummy object",
 "dwdstore",
 "entitybatch",
 "explosiontype",
@@ -257,7 +264,9 @@ static const char* poolEntriesTable[] = {
 "interiorproxy",
 "iplstore",
 "itemset",
+"itemsetbuffer",
 "known",
+"known refs",
 "lightentity",
 "mapdataloadednode",
 "mapdatastore",
@@ -284,6 +293,8 @@ static const char* poolEntriesTable[] = {
 "orders",
 "patrolroute",
 "pedintelligence",
+"pedprop render data",
+"pedprop req data",
 "peds",
 "phinstgta",
 "physicsbounds",
@@ -307,6 +318,8 @@ static const char* poolEntriesTable[] = {
 "scriptstore",
 "shapetesttaskdata",
 "staticbounds",
+"streamped render data",
+"streamped req data",
 "syncedscenes",
 "targetting",
 "tasksequenceinfo",
@@ -363,7 +376,11 @@ static void* PoolAllocateWrap(atPoolBase* pool)
 		if ((float)pool->GetCount() / (float)pool->GetSize() * 100.00f > LogPercentUsageWarningAmount)
 		{
 			auto it = g_inversePools.find(pool);
-			uint32_t poolHash = it->second;
+
+			uint32_t poolHash = 0;
+			if (g_inversePools.count(pool) != 0)
+				poolHash = it->second;
+
 			std::string poolName = poolEntries.LookupHashString(poolHash);
 			std::string poolNameHash = poolEntries.LookupHash(poolHash);
 
@@ -409,7 +426,10 @@ static void* PoolAllocateWrap(atPoolBase* pool)
 	{
 		auto it = g_inversePools.find(pool);
 
-		uint32_t poolHash = it->second;
+		uint32_t poolHash = 0;
+		if (g_inversePools.count(pool) != 0)
+			poolHash = it->second;
+
 		std::string poolName = poolEntries.LookupHashString(poolHash);
 		std::string poolNameHash = poolEntries.LookupHash(poolHash);
 
