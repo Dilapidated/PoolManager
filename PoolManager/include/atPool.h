@@ -61,6 +61,11 @@ public:
 		return count;
 	}
 
+	size_t GetEntrySize()
+	{
+		return m_entrySize;
+	}
+
 	size_t GetSize()
 	{
 		return m_count;
@@ -75,77 +80,5 @@ public:
 				delete GetAt<VirtualDtorBase>(i);
 			}
 		}
-	}
-};
-
-template<typename T>
-class atPool : public atPoolBase
-{
-public:
-	struct iterator : public std::iterator<std::forward_iterator_tag, T*>
-	{
-		iterator(atPool<T>* pool, int index)
-			: m_basePool(pool), m_index(index)
-		{
-
-		}
-
-		inline void operator++()
-		{
-			m_index = m_basePool->FindNext(m_index);
-		}
-
-		inline T* operator*()
-		{
-			return m_basePool->GetAt(m_index);
-		}
-
-		inline T& operator->()
-		{
-			return *m_basePool->GetAt(m_index);
-		}
-
-		inline bool operator==(iterator right)
-		{
-			return (m_basePool == right.m_basePool && m_index && right.m_index);
-		}
-
-		inline bool operator!=(iterator right)
-		{
-			return !(*this == right);
-		}
-
-	private:
-		atPool<T>* m_basePool;
-		int m_index;
-	};
-
-public:
-	T* GetAt(int index)
-	{
-		return atPoolBase::GetAt<T>(index);
-	}
-
-	int FindNext(int index)
-	{
-		for (int i = (index + 1); i < m_count; i++)
-		{
-			if (m_flags[i] >= 0)
-			{
-				return i;
-			}
-		}
-
-		return m_count;
-	}
-
-	inline iterator begin()
-	{
-		return iterator(this, 0);
-	}
-
-	inline iterator end()
-	{
-		return iterator(this, m_count);
 	}
 };

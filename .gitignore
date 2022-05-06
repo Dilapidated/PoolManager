@@ -1,0 +1,9 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/PoolManager
+/PoolManager/build/bin/Release/PoolManager.map
+/PoolManager/build/tmp/Release
+/PoolManager/dependencies
+/PoolManager/include/jitasm.h

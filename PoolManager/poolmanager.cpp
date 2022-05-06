@@ -1,9 +1,7 @@
 #include "atPool.h"
+#include "joaat.h"
 #include <Hooking.h>
 #include <MinHook.h>
-#include <iostream>
-#include <Utils.h>
-#include <sstream>
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -16,7 +14,7 @@ public:
 	{
 		for (int i = 0; i < Size; i++)
 		{
-			m_lookupList.insert({ HashString(list[i]), list[i] });
+			m_lookupList.insert({ joaat::generate(list[i]), list[i] });
 		}
 	}
 
@@ -55,9 +53,9 @@ private:
 	std::map<uint32_t, std::string_view> m_lookupList;
 };
 
-int LogPercentUsageWarning = GetPrivateProfileInt("POOL_SETTINGS", "LogPercentUsageWarning", 0, ".\\PoolManager.ini");
-int LogPercentUsageWarningAmount = GetPrivateProfileInt("POOL_SETTINGS", "LogPercentUsageWarningAmount", 50, ".\\PoolManager.ini");
-int LogInitialPoolAmounts = GetPrivateProfileInt("POOL_SETTINGS", "LogInitialPoolAmounts ", 0, ".\\PoolManager.ini");
+int LogPercentUsageWarning = GetPrivateProfileInt("POOL_SETTINGS", "LogPercentUsageWarning", 0, ".\\PoolManager.toml");
+int LogPercentUsageWarningAmount = GetPrivateProfileInt("POOL_SETTINGS", "LogPercentUsageWarningAmount", 50, ".\\PoolManager.toml");
+int LogInitialPoolAmounts = GetPrivateProfileInt("POOL_SETTINGS", "LogInitialPoolAmounts ", 0, ".\\PoolManager.toml");
 
 static std::string LastPoolLogged;
 static int LastSizeLogged;
@@ -88,8 +86,8 @@ void cleanUpLogs()
 
 static std::map<uint32_t, atPoolBase*> g_pools;
 static std::map<atPoolBase*, uint32_t> g_inversePools;
-static std::map<std::string, int> g_intPools;
-static std::multimap<int, std::string> g_intPoolsMulti;
+static std::map<std::string, UINT> g_intPools;
+static std::multimap<UINT, std::string> g_intPoolsMulti;
 
 static const char* poolEntriesTable[] = {
 "actiontable_branches",
@@ -478,23 +476,26 @@ static void* PoolAllocateWrap(atPoolBase* pool)
 }
 
 
-typedef std::uint32_t(*GetSizeOfPool_t)(void* _this, uint32_t hash, std::uint32_t minSize);
+typedef std::uint32_t(*GetSizeOfPool_t)(PVOID _this, std::uint32_t poolHash, std::uint32_t defaultSize);
 GetSizeOfPool_t g_origSizeOfPool = nullptr;
 
-std::uint32_t GetSizeOfPool(void* _this, uint32_t hash, std::uint32_t minSize)
+std::uint32_t GetSizeOfPool(PVOID _this, std::uint32_t poolHash, std::uint32_t defaultSize)
 {
 
-	auto value = g_origSizeOfPool(_this, hash, minSize);
-	std::string poolName = poolEntries.LookupHashString(hash);
-	std::string poolNameHash = poolEntries.LookupHash(hash);
+	auto value = g_origSizeOfPool(_this, poolHash, defaultSize);
+	std::string poolName = poolEntries.LookupHashString(poolHash);
+	std::string poolNameHash = poolEntries.LookupHash(poolHash);
 
 	auto it = g_intPools.find(poolName);
 	if (it == g_intPools.end())
 	{
 		g_intPools.insert({ poolName, value });
-		g_intPoolsMulti.insert({ value, poolName });
 		if (LogInitialPoolAmounts != 0)
 		{
+			if (poolName == poolNameHash)
+			{
+				poolName = "unknown";
+			}
 			std::ofstream outfile;
 			outfile.open("PoolManager_Startup.log", std::ios_base::app);
 			outfile << "poolName: " << poolName.c_str() << std::endl
@@ -517,54 +518,73 @@ static struct MhInit
 
 void InitializeMod()
 {
+	// Clean up logging
+	cleanUpLogs();
 
-	auto registerPools = [](hook::pattern& patternMatch, int callOffset, int hashOffset)
+	auto registerPool = [](hook::pattern_match match, int callOffset, uint32_t hash, uint32_t poolOffset)
+	{
+		struct : jitasm::Frontend
+		{
+			uint32_t hash;
+			uint32_t offset;
+			uint64_t origFn;
+
+			void InternalMain() override
+			{
+				push(rcx);
+				push(rdx);
+				push(r8);
+				push(r9);
+
+				sub(rsp, 0x38);
+
+				add(rcx, offset);
+				mov(edx, hash);
+
+				mov(rax, (uint64_t)&SetPoolFn);
+				call(rax);
+
+				add(rsp, 0x38);
+
+				pop(r9);
+				pop(r8);
+				pop(rdx);
+				pop(rcx);
+
+				mov(rax, origFn);
+				jmp(rax);
+			}
+		}*stub = new std::remove_pointer_t<decltype(stub)>();
+
+		stub->hash = hash;
+		stub->offset = poolOffset;
+
+		auto call = match.get<void>(callOffset);
+		hook::set_call(&stub->origFn, call);
+		hook::call(call, stub->GetCode());
+	};
+
+	auto registerPools = [&](hook::pattern& patternMatch, int callOffset, int hashOffset)
 	{
 		for (size_t i = 0; i < patternMatch.size(); i++)
 		{
 			auto match = patternMatch.get(i);
-			auto hash = *match.get<uint32_t>(hashOffset);
-
-			struct : jitasm::Frontend
-			{
-				uint32_t hash;
-				uint64_t origFn;
-
-				void InternalMain() override
-				{
-					sub(rsp, 0x38);
-
-					mov(rax, qword_ptr[rsp + 0x38 + 0x28]);
-					mov(qword_ptr[rsp + 0x20], rax);
-
-					mov(rax, qword_ptr[rsp + 0x38 + 0x30]);
-					mov(qword_ptr[rsp + 0x28], rax);
-
-					mov(rax, origFn);
-					call(rax);
-
-					mov(rcx, rax);
-					mov(edx, hash);
-
-					mov(rax, (uint64_t)&SetPoolFn);
-					call(rax);
-
-					add(rsp, 0x38);
-
-					ret();
-				}
-			}*stub = new std::remove_pointer_t<decltype(stub)>();
-
-			stub->hash = hash;
-
-			auto call = match.get<void>(callOffset);
-			hook::set_call(&stub->origFn, call);
-			hook::call(call, stub->GetCode());
+			registerPool(match, callOffset, *match.get<uint32_t>(hashOffset), NULL);
 		}
 	};
 
-	// Clean up logging
-	cleanUpLogs();
+	auto registerNamedPools = [&](hook::pattern& patternMatch, int callOffset, int poolOffset)
+	{
+		for (size_t i = 0; i < patternMatch.size(); i++)
+		{
+			auto match = patternMatch.get(i);
+
+			const char* name = match.get<const char>(0);
+			name = name + *(int32_t*)(name + 3) + 7;
+
+			registerPool(match, callOffset, joaat::generate(name), poolOffset);
+		}
+	};
 
 	// Find initial pools
 	registerPools(hook::pattern("BA ? ? ? ? 41 B8 ? ? ? 00 E8 ? ? ? ? 4C 8D 05"), 0x2C, 1);
@@ -573,17 +593,18 @@ void InitializeMod()
 	registerPools(hook::pattern("BA ? ? ? ? 41 B8 ? 00 00 00 E8 ? ? ? ? C6"), 0x35, 1);
 	registerPools(hook::pattern("44 8B C0 BA ? ? ? ? E8 ? ? ? ? 4C 8D 05"), 0x25, 4);
 
+	registerNamedPools(hook::pattern("48 8D 15 ? ? ? ? 45 8D 41 ? 48 8B ? C7"), 0x15, 0x38);
+
 	// Get Initial Pool Sizes
-	if (std::filesystem::exists(".\\ScriptHookV.dll")) //If using SHV use different pattern to avoid double hook
+	if (std::filesystem::exists(".\\ScriptHookV.dll")) //If using SHV hook into SHV and get pools
 	{
-		uint8_t* loc = hook::get_pattern<uint8_t>("E8 ? ? ? ? 48 8D 4F 38 41 B0 01 8B D0", 1);
-		loc += *(int32_t*)loc + 4;
+		auto loc = hook::get_module_pattern("ScriptHookV.dll", "40 53 48 83 EC ? 0F");
 		MH_CreateHook(loc, GetSizeOfPool, (void**)&g_origSizeOfPool);
 	}
 	else
 	{
-		void* loc = hook::get_pattern("45 33 DB 44 8B D2 66 44 39 59 ? 74 4B");
-		MH_CreateHook(loc, GetSizeOfPool, (void**)&g_origSizeOfPool);
+		auto addr = hook::get_call(hook::get_pattern("E8 ? ? ? ? 48 8D 4F 38 41 B0 01"));
+		MH_CreateHook(addr, GetSizeOfPool, (void**)&g_origSizeOfPool);
 	}
 
 
