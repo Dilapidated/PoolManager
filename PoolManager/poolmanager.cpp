@@ -332,6 +332,7 @@ static const char* poolEntriesTable[] = {
 "vehiclestruct",
 "wheels",
 "wptrec",
+"vehicleaudioentity",
 #include "gta_vtables.h"
 };
 
