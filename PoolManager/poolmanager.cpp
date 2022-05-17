@@ -4,7 +4,6 @@
 #include <MinHook.h>
 #include <iostream>
 #include <fstream>
-#include <filesystem>
 
 class RageHashList
 {
@@ -597,7 +596,7 @@ void InitializeMod()
 	registerNamedPools(hook::pattern("48 8D 15 ? ? ? ? 45 8D 41 ? 48 8B ? C7"), 0x15, 0x38);
 
 	// Get Initial Pool Sizes
-	if (std::filesystem::exists(".\\ScriptHookV.dll")) //If using SHV hook into SHV and get pools
+	if (GetModuleHandle("ScriptHookV.dll") != nullptr) //If using SHV hook into SHV and get pools
 	{
 		auto loc = hook::get_module_pattern("ScriptHookV.dll", "40 53 48 83 EC ? 0F");
 		MH_CreateHook(loc, GetSizeOfPool, (void**)&g_origSizeOfPool);
