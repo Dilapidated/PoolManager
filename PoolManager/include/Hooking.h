@@ -106,4 +106,13 @@ namespace hook
 		}
 	};
 
+	template<typename T, typename TAddr>
+	inline T get_address(TAddr address)
+	{
+		intptr_t target = *(int32_t*)(ptrdiff_t)address;
+		target += ((ptrdiff_t)address + 4);
+
+		return (T)target;
+	}
+
 }
