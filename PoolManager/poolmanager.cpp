@@ -521,24 +521,27 @@ void InitializeMod()
 	// Clean up logging
 	cleanUpLogs();
 
-	auto registerPool = [](hook::pattern_match match, int callOffset, uint32_t hash, uint32_t poolOffset)
+	auto registerPool = [](hook::pattern_match match, int callOffset, uint32_t hash)
 	{
 		struct : jitasm::Frontend
 		{
 			uint32_t hash;
-			uint32_t offset;
 			uint64_t origFn;
 
 			void InternalMain() override
 			{
-				push(rcx);
-				push(rdx);
-				push(r8);
-				push(r9);
-
 				sub(rsp, 0x38);
 
-				add(rcx, offset);
+				mov(rax, qword_ptr[rsp + 0x38 + 0x28]);
+				mov(qword_ptr[rsp + 0x20], rax);
+
+				mov(rax, qword_ptr[rsp + 0x38 + 0x30]);
+				mov(qword_ptr[rsp + 0x28], rax);
+
+				mov(rax, origFn);
+				call(rax);
+
+				mov(rcx, rax);
 				mov(edx, hash);
 
 				mov(rax, (uint64_t)&SetPoolFn);
@@ -546,18 +549,11 @@ void InitializeMod()
 
 				add(rsp, 0x38);
 
-				pop(r9);
-				pop(r8);
-				pop(rdx);
-				pop(rcx);
-
-				mov(rax, origFn);
-				jmp(rax);
+				ret();
 			}
-		}*stub = new std::remove_pointer_t<decltype(stub)>();
+		} *stub = new std::remove_pointer_t<decltype(stub)>();
 
 		stub->hash = hash;
-		stub->offset = poolOffset;
 
 		auto call = match.get<void>(callOffset);
 		hook::set_call(&stub->origFn, call);
@@ -569,23 +565,19 @@ void InitializeMod()
 		for (size_t i = 0; i < patternMatch.size(); i++)
 		{
 			auto match = patternMatch.get(i);
-			registerPool(match, callOffset, *match.get<uint32_t>(hashOffset), NULL);
+			registerPool(match, callOffset, *match.get<uint32_t>(hashOffset));
 		}
 	};
 
-	auto registerNamedPools = [&](hook::pattern& patternMatch, int callOffset, int poolOffset)
+	auto registerNamedPools = [&](hook::pattern& patternMatch, int callOffset, int nameOffset)
 	{
 		for (size_t i = 0; i < patternMatch.size(); i++)
 		{
 			auto match = patternMatch.get(i);
-
-			const char* name = match.get<const char>(0);
-			name = name + *(int32_t*)(name + 3) + 7;
-
-			registerPool(match, callOffset, joaat::generate(name), poolOffset);
+			char* name = hook::get_address<char*>(match.get<void*>(nameOffset));
+			registerPool(match, callOffset, joaat::generate(name));
 		}
 	};
-
 	// Find initial pools
 	registerPools(hook::pattern("BA ? ? ? ? 41 B8 ? ? ? 00 E8 ? ? ? ? 4C 8D 05"), 0x2C, 1);
 	registerPools(hook::pattern("C6 BA ? ? ? ? E8 ? ? ? ? 4C 8D 05"), 0x27, 2);
@@ -593,7 +585,7 @@ void InitializeMod()
 	registerPools(hook::pattern("BA ? ? ? ? 41 B8 ? 00 00 00 E8 ? ? ? ? C6"), 0x35, 1);
 	registerPools(hook::pattern("44 8B C0 BA ? ? ? ? E8 ? ? ? ? 4C 8D 05"), 0x25, 4);
 
-	registerNamedPools(hook::pattern("48 8D 15 ? ? ? ? 45 8D 41 ? 48 8B ? C7"), 0x15, 0x38);
+	registerNamedPools(hook::pattern("48 8D 15 ? ? ? ? 45 8D 41 ? 48 8B ? C7"), 0x15, 0x3);
 
 	// Get Initial Pool Sizes
 	if (GetModuleHandle("ScriptHookV.dll") != nullptr) //If using SHV hook into SHV and get pools
