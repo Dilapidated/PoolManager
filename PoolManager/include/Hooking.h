@@ -13,11 +13,16 @@
 
 namespace hook
 {
-	//find patterns in external module
+	//find patterns in a specific module
 	template<typename T = void>
 	inline auto get_module_pattern(const char* modulename, std::string_view pattern_string, ptrdiff_t offset = 0)
 	{
-		return pattern(GetModuleHandle(modulename), std::move(pattern_string)).get_first<T>(offset);
+		auto moduleHandle = GetModuleHandle(modulename);
+
+		if (moduleHandle != nullptr)
+		{
+			return pattern(moduleHandle, std::move(pattern_string)).get_first<T>(offset);
+		}
 	}
 
 	template<typename AddressType>
@@ -100,5 +105,14 @@ namespace hook
 			return (void*)get_member(function);
 		}
 	};
+
+	template<typename T, typename TAddr>
+	inline T get_address(TAddr address)
+	{
+		intptr_t target = *(int32_t*)(ptrdiff_t)address;
+		target += ((ptrdiff_t)address + 4);
+
+		return (T)target;
+	}
 
 }
