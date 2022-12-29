@@ -54,6 +54,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="PoolManager.toml" />
+    <None Include="PoolManager.ini" />
   </ItemGroup>
 </Project>

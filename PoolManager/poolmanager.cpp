@@ -52,9 +52,9 @@ private:
 	std::map<uint32_t, std::string_view> m_lookupList;
 };
 
-int LogPercentUsageWarning = GetPrivateProfileInt("POOL_SETTINGS", "LogPercentUsageWarning", 0, ".\\PoolManager.toml");
-int LogPercentUsageWarningAmount = GetPrivateProfileInt("POOL_SETTINGS", "LogPercentUsageWarningAmount", 50, ".\\PoolManager.toml");
-int LogInitialPoolAmounts = GetPrivateProfileInt("POOL_SETTINGS", "LogInitialPoolAmounts ", 0, ".\\PoolManager.toml");
+int LogPercentUsageWarning = GetPrivateProfileInt("POOL_SETTINGS", "LogPercentUsageWarning", 0, ".\\PoolManager.ini");
+int LogPercentUsageWarningAmount = GetPrivateProfileInt("POOL_SETTINGS", "LogPercentUsageWarningAmount", 50, ".\\PoolManager.ini");
+int LogInitialPoolAmounts = GetPrivateProfileInt("POOL_SETTINGS", "LogInitialPoolAmounts ", 0, ".\\PoolManager.ini");
 
 static std::string LastPoolLogged;
 static int LastSizeLogged;
@@ -521,15 +521,25 @@ void InitializeMod()
 	// Clean up logging
 	cleanUpLogs();
 
-	auto registerPool = [](hook::pattern_match match, int callOffset, uint32_t hash)
+	auto registerPool = [](hook::pattern_match match, int callOffset, uint32_t hash, bool isAssetStore)
 	{
 		struct : jitasm::Frontend
 		{
 			uint32_t hash;
 			uint64_t origFn;
+			bool isAssetStore;
 
 			void InternalMain() override
 			{
+				char buffer[32];
+				snprintf(buffer, std::size(buffer), "0x%08X", hash);
+
+				/*std::ofstream outfile;
+				outfile.open("PoolManager_TEST.log", std::ios_base::app);
+				outfile << "poolHash: " << buffer << std::endl
+					<< std::endl;
+				outfile.close();*/
+
 				sub(rsp, 0x38);
 
 				mov(rax, qword_ptr[rsp + 0x38 + 0x28]);
@@ -542,6 +552,9 @@ void InitializeMod()
 				call(rax);
 
 				mov(rcx, rax);
+				if (isAssetStore) // Only set to true in registerNamedPool. Hook asset store constructor, but with this+0x38 so to get the address of the pool field.
+					add(rcx, 0x38);
+
 				mov(edx, hash);
 
 				mov(rax, (uint64_t)&SetPoolFn);
@@ -565,7 +578,7 @@ void InitializeMod()
 		for (size_t i = 0; i < patternMatch.size(); i++)
 		{
 			auto match = patternMatch.get(i);
-			registerPool(match, callOffset, *match.get<uint32_t>(hashOffset));
+			registerPool(match, callOffset, *match.get<uint32_t>(hashOffset), false);
 		}
 	};
 
@@ -575,17 +588,30 @@ void InitializeMod()
 		{
 			auto match = patternMatch.get(i);
 			char* name = hook::get_address<char*>(match.get<void*>(nameOffset));
-			registerPool(match, callOffset, joaat::generate(name));
+			registerPool(match, callOffset, joaat::generate(name), true);
 		}
 	};
+
+	auto registerPoolsPatch = [&](hook::pattern& patternMatch, int callOffset, int hashOffset) // used to avoid crashing with specific pools
+	{
+		size_t from = 0;
+		size_t to = patternMatch.size();
+		for (size_t i = from; i < to; i++)
+		{
+			auto match = patternMatch.get(i);
+			if (poolEntries.LookupHash(*match.get<uint32_t>(hashOffset)) == "0x5F91F738") continue; // crashes with this pool (0x5F91F738 = netshoptransactions)
+			registerPool(match, callOffset, *match.get<uint32_t>(hashOffset), false);
+		}
+	};
+
 	// Find initial pools
-	registerPools(hook::pattern("BA ? ? ? ? 41 B8 ? ? ? 00 E8 ? ? ? ? 4C 8D 05"), 0x2C, 1);
+	registerPoolsPatch(hook::pattern("BA ? ? ? ? 41 B8 ? ? ? 00 E8 ? ? ? ? 4C 8D 05"), 0x2C, 1);
 	registerPools(hook::pattern("C6 BA ? ? ? ? E8 ? ? ? ? 4C 8D 05"), 0x27, 2);
 	registerPools(hook::pattern("BA ? ? ? ? E8 ? ? ? ? C6 ? ? ? 01 4C"), 0x2F, 1);
 	registerPools(hook::pattern("BA ? ? ? ? 41 B8 ? 00 00 00 E8 ? ? ? ? C6"), 0x35, 1);
 	registerPools(hook::pattern("44 8B C0 BA ? ? ? ? E8 ? ? ? ? 4C 8D 05"), 0x25, 4);
 
-	registerNamedPools(hook::pattern("48 8D 15 ? ? ? ? 45 8D 41 ? 48 8B ? C7"), 0x15, 0x3);
+	registerNamedPools(hook::pattern("48 8D 15 ? ? ? ? 45 8D 41 ? 48 8B ? C7"), 0x15, 0x3); // fwAssetStores
 
 	// Get Initial Pool Sizes
 	if (GetModuleHandle("ScriptHookV.dll") != nullptr) //If using SHV hook into SHV and get pools
@@ -598,8 +624,6 @@ void InitializeMod()
 		auto addr = hook::get_call(hook::get_pattern("E8 ? ? ? ? 48 8D 4F 38 41 B0 01"));
 		MH_CreateHook(addr, GetSizeOfPool, (void**)&g_origSizeOfPool);
 	}
-
-
 
 	// Pool Allocate Wrap
 	MH_CreateHook(hook::get_pattern("18 83 F9 FF 75 03 33 C0 C3 41", -6), PoolAllocateWrap, (void**)&g_origPoolAllocate);
