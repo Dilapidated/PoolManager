@@ -534,12 +534,6 @@ void InitializeMod()
 				char buffer[32];
 				snprintf(buffer, std::size(buffer), "0x%08X", hash);
 
-				/*std::ofstream outfile;
-				outfile.open("PoolManager_TEST.log", std::ios_base::app);
-				outfile << "poolHash: " << buffer << std::endl
-					<< std::endl;
-				outfile.close();*/
-
 				sub(rsp, 0x38);
 
 				mov(rax, qword_ptr[rsp + 0x38 + 0x28]);
