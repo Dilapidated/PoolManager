@@ -1,0 +1,9 @@
+[submodule "PoolManager/dependencies/patterns"]
+	path = PoolManager/dependencies/patterns
+	url = https://github.com/ThirteenAG/Hooking.Patterns.git
+[submodule "PoolManager/dependencies/jitasm"]
+	path = PoolManager/dependencies/jitasm
+	url = https://github.com/hikaru-i/jitasm.git
+[submodule "PoolManager/dependencies/minhook"]
+	path = PoolManager/dependencies/minhook
+	url = https://github.com/TsudaKageyu/minhook.git
