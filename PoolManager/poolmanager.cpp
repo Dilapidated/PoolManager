@@ -531,9 +531,6 @@ void InitializeMod()
 
 			void InternalMain() override
 			{
-				char buffer[32];
-				snprintf(buffer, std::size(buffer), "0x%08X", hash);
-
 				sub(rsp, 0x38);
 
 				mov(rax, qword_ptr[rsp + 0x38 + 0x28]);
