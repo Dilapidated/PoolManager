@@ -543,7 +543,7 @@ void InitializeMod()
 				call(rax);
 
 				mov(rcx, rax);
-				if (isAssetStore) // Only set to true in registerNamedPool. Hook asset store constructor, but with this+0x38 so to get the address of the pool field.
+				if (isAssetStore == true) // Only set to true in registerNamedPool. Hook asset store constructor, but with this+0x38 so to get the address of the pool field.
 					add(rcx, 0x38);
 
 				mov(edx, hash);
@@ -558,6 +558,7 @@ void InitializeMod()
 		} *stub = new std::remove_pointer_t<decltype(stub)>();
 
 		stub->hash = hash;
+		stub->isAssetStore = isAssetStore;
 
 		auto call = match.get<void>(callOffset);
 		hook::set_call(&stub->origFn, call);
@@ -607,7 +608,7 @@ void InitializeMod()
 	// Get Initial Pool Sizes
 	if (GetModuleHandle("ScriptHookV.dll") != nullptr) //If using SHV hook into SHV and get pools
 	{
-		auto loc = hook::get_module_pattern("ScriptHookV.dll", "40 53 48 83 EC ? 0F");
+		auto loc = hook::get_module_pattern<uint8_t>("ScriptHookV.dll", "40 53 48 83 EC ? 0F");
 		MH_CreateHook(loc, GetSizeOfPool, (void**)&g_origSizeOfPool);
 	}
 	else
