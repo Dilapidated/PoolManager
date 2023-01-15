@@ -15,13 +15,17 @@ namespace hook
 {
 	//find patterns in a specific module
 	template<typename T = void>
-	inline auto get_module_pattern(const char* modulename, std::string_view pattern_string, ptrdiff_t offset = 0)
+	inline auto get_module_pattern(std::string_view moduleName, std::string_view pattern_string, ptrdiff_t offset = 0)
 	{
-		auto moduleHandle = GetModuleHandle(modulename);
-
-		if (moduleHandle != nullptr)
+		auto moduleHandle = GetModuleHandle(moduleName.data());
+		auto match = pattern(moduleHandle, std::move(pattern_string)).get_first<T>(offset);
+		if ((moduleHandle != nullptr) && (match != nullptr))
 		{
-			return pattern(moduleHandle, std::move(pattern_string)).get_first<T>(offset);
+			return match;
+		}
+		else
+		{
+			throw std::runtime_error("pattern not found!");
 		}
 	}
 
@@ -35,13 +39,22 @@ namespace hook
 		memset((void*)address, 0x90, length);
 
 		VirtualProtect((void*)address, length, oldProtect, &oldProtect);
+		FlushInstructionCache(GetCurrentProcess(), (void*)address, length);
 	}
 
 	template<typename ValueType, typename AddressType>
 	inline void put(AddressType address, ValueType value)
 	{
+		DWORD oldProtect;
+		VirtualProtect((void*)address, sizeof(value), PAGE_EXECUTE_READWRITE, &oldProtect);
+
 		memcpy((void*)address, &value, sizeof(value));
+
+		VirtualProtect((void*)address, sizeof(value), oldProtect, &oldProtect);
+
+		FlushInstructionCache(GetCurrentProcess(), (void*)address, sizeof(value));
 	}
+
 
 	template <typename ValueType, typename AddressType>
 	inline void putVP(AddressType address, ValueType value)
@@ -72,7 +85,7 @@ namespace hook
 		LPVOID funcStub = AllocateFunctionStub((void*)GetModuleHandle(NULL), get_func_ptr<T>::get(func), Register);
 
 		put<uint8_t>(address, 0xE8);
-		put<int>((uintptr_t)address + 1, (intptr_t)funcStub - (intptr_t)address - 5);
+		put<int>((uintptr_t)address + 1, (intptr_t)funcStub - (intptr_t)uintptr_t(address) - 5);
 	}
 
 	template <typename T, typename AT>
